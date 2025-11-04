@@ -43,11 +43,27 @@ class AuthService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Login failed');
+      const errorText = await response.text();
+      let errorMessage = 'Login failed';
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
 
-    return await response.json();
+    const responseText = await response.text();
+    if (!responseText) {
+      throw new Error('Empty response from server');
+    }
+    
+    try {
+      return JSON.parse(responseText);
+    } catch (e) {
+      throw new Error('Invalid JSON response from server');
+    }
   }
 
   async register(userData: RegisterRequest): Promise<AuthResponse> {
@@ -60,11 +76,27 @@ class AuthService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Registration failed');
+      const errorText = await response.text();
+      let errorMessage = 'Registration failed';
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
 
-    return await response.json();
+    const responseText = await response.text();
+    if (!responseText) {
+      throw new Error('Empty response from server');
+    }
+    
+    try {
+      return JSON.parse(responseText);
+    } catch (e) {
+      throw new Error('Invalid JSON response from server');
+    }
   }
 
   logout(): void {
@@ -75,7 +107,11 @@ class AuthService {
   getCurrentUser(): User | null {
     const userStr = localStorage.getItem('user');
     if (userStr) {
-      return JSON.parse(userStr);
+      try {
+        return JSON.parse(userStr);
+      } catch (e) {
+        return null;
+      }
     }
     return null;
   }
@@ -86,6 +122,27 @@ class AuthService {
 
   isLoggedIn(): boolean {
     return !!this.getToken();
+  }
+
+  async validateToken(): Promise<boolean> {
+    const token = this.getToken();
+    if (!token) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.ok;
+    } catch (error) {
+      return false;
+    }
   }
 }
 

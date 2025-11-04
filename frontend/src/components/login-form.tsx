@@ -18,13 +18,14 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import AuthService from "@/services/auth.service"
+import { useAuth } from "@/context/auth-context"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,9 +37,7 @@ export function LoginForm({
     setError("");
 
     try {
-      const response = await AuthService.login({ email, password });
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
+      await login(email, password);
       router.push("/dashboard");
     } catch (err: unknown) {
       if (err instanceof Error) {
