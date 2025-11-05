@@ -4,6 +4,7 @@ import com.chatter.backend.model.ChatMessage;
 import com.chatter.backend.model.User;
 import com.chatter.backend.repository.ChatMessageRepository;
 import com.chatter.backend.repository.UserRepo;
+import com.chatter.backend.service.NotificationService;
 import com.chatter.backend.util.JwtUtil;
 import com.chatter.backend.dto.ChatMessageDTO;
 
@@ -14,6 +15,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +36,9 @@ public class ChatController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private NotificationService notificationService;
 
     @MessageMapping("/chat")
     public void sendMessage(@Payload ChatMessage chatMessage) {
@@ -96,10 +101,22 @@ public class ChatController {
         
         logger.info("Saved private chat message with ID: {}", savedMessage.getId());
         
+        // Create notification for receiver
+        String notificationMessage = String.format("%s sent you a message: %s", 
+            sender.getName(), 
+            messageDTO.getContent().length() > 50 ? messageDTO.getContent().substring(0, 50) + "..." : messageDTO.getContent());
+        notificationService.createNotification(receiver, notificationMessage, "MESSAGE");
+        
         // Update DTO with saved message data
         messageDTO.setId(savedMessage.getId());
         messageDTO.setTimestamp(savedMessage.getTimestamp());
         messageDTO.setRead(savedMessage.isRead());
+        messageDTO.setFileUrl(savedMessage.getFileUrl());
+        messageDTO.setFileName(savedMessage.getFileName());
+        messageDTO.setFileType(savedMessage.getFileType());
+        messageDTO.setFileSize(savedMessage.getFileSize());
+        messageDTO.setMessageType(savedMessage.getMessageType());
+        messageDTO.setDeleted(savedMessage.isDeleted());
         
         // Ensure sender and receiver DTOs have all fields
         messageDTO.getSender().setName(sender.getName());
@@ -123,6 +140,13 @@ public class ChatController {
             String.valueOf(sender.getId()), 
             "/queue/messages", 
             messageDTO
+        );
+        
+        // Notify receiver about new notification
+        messagingTemplate.convertAndSendToUser(
+            String.valueOf(receiver.getId()),
+            "/queue/notifications",
+            Map.of("type", "NEW_NOTIFICATION")
         );
     }
 }

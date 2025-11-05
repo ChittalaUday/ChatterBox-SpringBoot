@@ -13,6 +13,12 @@ export interface ChatMessage {
   content: string;
   timestamp?: string;
   isRead?: boolean;
+  fileUrl?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
+  messageType?: string; // TEXT, IMAGE, FILE, AUDIO, VIDEO
+  isDeleted?: boolean;
 }
 
 export interface FriendRequest {
@@ -38,6 +44,8 @@ export interface User {
   gender: string;
   dob: string;
   mobile?: string;
+  profileImageUrl?: string;
+  bio?: string;
   createdAt: string;
   updatedAt: string;
 }

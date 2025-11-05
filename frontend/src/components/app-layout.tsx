@@ -12,9 +12,10 @@ import ProtectedRoute from "./protected-route";
 
 interface AppLayoutProps {
   children: React.ReactNode;
+  onRefreshFriends?: () => void;
 }
 
-export function AppLayout({ children }: AppLayoutProps) {
+export function AppLayout({ children, onRefreshFriends }: AppLayoutProps) {
   const { user } = useAuth();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -28,9 +29,18 @@ export function AppLayout({ children }: AppLayoutProps) {
       : null
     : null;
 
+  const refreshFriends = async () => {
+    if (user) {
+      await loadFriends();
+      if (onRefreshFriends) {
+        onRefreshFriends();
+      }
+    }
+  };
+
   useEffect(() => {
     if (user) {
-      loadFriends();
+      refreshFriends();
       connectToWebSocket();
     }
   }, [user]);
@@ -60,6 +70,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             loading={loading} 
             currentPath={pathname}
             selectedFriendId={selectedFriendId}
+            onRefreshUnreadCounts={refreshFriends}
           />
           <main className="flex-1 flex flex-col overflow-hidden bg-background">
             {children}

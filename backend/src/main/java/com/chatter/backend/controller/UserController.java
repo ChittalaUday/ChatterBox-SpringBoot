@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 @RestController
 public class UserController {
@@ -55,6 +56,11 @@ public class UserController {
         user.setGender(registerRequest.getGender());
         user.setDob(registerRequest.getDob());
         user.setMobile(registerRequest.getMobile());
+        
+        // Handle profile image URL if provided
+        if (registerRequest.getProfileImageUrl() != null) {
+            user.setProfileImageUrl(registerRequest.getProfileImageUrl());
+        }
         
         // Set default role
         user.setRole("USER");
@@ -223,6 +229,44 @@ public class UserController {
         return ResponseEntity.ok(Map.of(
                 "message", "User updated successfully",
                 "user", updatedUser));
+    }
+
+    @PutMapping("/users/me/password")
+    public ResponseEntity<?> changePassword(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody Map<String, String> passwordData) {
+        
+        try {
+            String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : authHeader;
+            String email = jwtUtil.extractUsername(token);
+            
+            User user = userRepo.findByEmail(email);
+            if (user == null) {
+                return ResponseEntity.status(404).body(Map.of("message", "User not found"));
+            }
+            
+            String currentPassword = passwordData.get("currentPassword");
+            String newPassword = passwordData.get("newPassword");
+            
+            if (currentPassword == null || newPassword == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Current password and new password are required"));
+            }
+            
+            if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+                return ResponseEntity.status(401).body(Map.of("message", "Current password is incorrect"));
+            }
+            
+            if (newPassword.length() < 6) {
+                return ResponseEntity.badRequest().body(Map.of("message", "New password must be at least 6 characters long"));
+            }
+            
+            user.setPassword(passwordEncoder.encode(newPassword));
+            userRepo.save(user);
+            
+            return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Error changing password: " + e.getMessage()));
+        }
     }
 
 }

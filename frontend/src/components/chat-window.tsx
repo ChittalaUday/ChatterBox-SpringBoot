@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Send, MessageSquare } from "lucide-react";
+import { Send, MessageSquare, Check, CheckCheck, Paperclip, X, Image, File, Video, Music, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
+import { useNotifications } from "@/context/notification-context";
 import WebSocketService from "@/services/websocket.service";
 import ChatMessageService from "@/services/chat-message.service";
 import { ChatMessage, User } from "@/services/chat.types";
@@ -18,11 +19,18 @@ interface ChatWindowProps {
 
 export function ChatWindow({ friend, onBack }: ChatWindowProps) {
   const { user } = useAuth();
+  const { refreshCount } = useNotifications();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
+  const [isTyping, setIsTyping] = useState(false);
+  const [friendTyping, setFriendTyping] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const loadChatHistory = async () => {
     try {
@@ -31,6 +39,25 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
       const history = await ChatMessageService.getChatHistory(friend.id);
       console.log('Loaded chat history:', history);
       setMessages(history);
+
+      // Mark messages as read when chat is opened
+      if (user?.id && friend.id) {
+        try {
+          await ChatMessageService.markMessagesAsRead(friend.id);
+          // Update local messages to reflect read status
+          setMessages(prev => prev.map(msg => {
+            if (msg.sender.id === friend.id && msg.receiver.id === user.id) {
+              return { ...msg, isRead: true };
+            }
+            return msg;
+          }));
+          // Refresh notification count
+          refreshCount();
+        } catch (err) {
+          console.error("Failed to mark messages as read", err);
+        }
+      }
+
       setLoading(false);
     } catch (err) {
       console.error("Failed to load chat history", err);
@@ -38,8 +65,23 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
     }
   };
 
-  const handleNewMessage = useCallback((message: ChatMessage) => {
+  const handleNewMessage = useCallback((message: ChatMessage | any) => {
     console.log('Received message in chat window:', message);
+
+    // Handle read status updates
+    if (message && message.type === "MESSAGES_READ") {
+      if (message.senderId === friend.id && message.receiverId === user?.id) {
+        // Messages from this friend have been read
+        setMessages(prev => prev.map(msg => {
+          if (msg.sender.id === friend.id && msg.receiver.id === user?.id && !msg.isRead) {
+            return { ...msg, isRead: true };
+          }
+          return msg;
+        }));
+      }
+      return;
+    }
+
     // Check if the message is between the current user and the friend
     if (
       message &&
@@ -153,11 +195,31 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
     // Add listener - handleNewMessage is now stable with useCallback
     WebSocketService.addMessageListener(handleNewMessage);
 
+    // Listen for typing indicators
+    const handleTypingMessage = (data: any) => {
+      if (data && data.type === "TYPING" && data.senderId === friend.id) {
+        setFriendTyping(data.isTyping || false);
+      }
+    };
+
+    // Subscribe to typing queue via WebSocket (if available)
+    // For now, we'll use the existing message listener
+    WebSocketService.addMessageListener((message: any) => {
+      if (message && message.type === "TYPING" && message.senderId === friend.id) {
+        setFriendTyping(message.isTyping || false);
+        // Auto-hide typing after 3 seconds
+        setTimeout(() => setFriendTyping(false), 3000);
+      }
+    });
+
     return () => {
       console.log('Cleaning up WebSocket listener');
       WebSocketService.removeMessageListener(handleNewMessage);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
     };
-  }, [handleNewMessage]); // handleNewMessage is stable with useCallback
+  }, [handleNewMessage, friend.id]); // handleNewMessage is stable with useCallback
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -250,7 +312,96 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    } else {
+      // Send typing indicator
+      handleTyping(true);
     }
+  };
+
+  const handleTyping = useCallback(async (typing: boolean) => {
+    if (!user?.id || !friend.id) return;
+
+    setIsTyping(typing);
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Send typing indicator
+    try {
+      await ChatMessageService.sendTypingIndicator(friend.id, typing);
+    } catch (err) {
+      console.error("Failed to send typing indicator", err);
+    }
+
+    // Auto-stop typing after 3 seconds
+    if (typing) {
+      typingTimeoutRef.current = setTimeout(() => {
+        handleTyping(false);
+      }, 3000);
+    }
+  }, [user?.id, friend.id]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile || !user) return;
+
+    try {
+      setUploading(true);
+      const fileData = await ChatMessageService.uploadFile(selectedFile);
+
+      // Send message with file
+      const savedMessage = await ChatMessageService.sendMessage(
+        friend.id,
+        selectedFile.name,
+        fileData
+      );
+
+      // Add message to chat
+      setMessages(prev => [...prev, savedMessage]);
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (err) {
+      console.error("Failed to upload file", err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    if (!messageId) return;
+
+    try {
+      await ChatMessageService.deleteMessage(messageId);
+      setMessages(prev => prev.map(msg =>
+        msg.id === messageId ? { ...msg, isDeleted: true } : msg
+      ));
+    } catch (err) {
+      console.error("Failed to delete message", err);
+    }
+  };
+
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const getFileIcon = (messageType?: string, fileType?: string) => {
+    if (messageType === "IMAGE") return Image;
+    if (messageType === "VIDEO") return Video;
+    if (messageType === "AUDIO") return Music;
+    return File;
   };
 
   if (loading) {
@@ -278,22 +429,30 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Header - Fixed at top */}
-      <div className="border-b bg-card px-6 py-4 flex items-center justify-between">
+      <div className="border-b bg-gradient-to-r from-card via-card to-primary/5 backdrop-blur-sm px-6 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center space-x-3">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={`https://api.dicebear.com/6.x/initials/svg?seed=${friend.name}`} />
-            <AvatarFallback className="bg-primary text-primary-foreground">
+          <Avatar className="h-12 w-12 border-2 border-primary/20 ring-2 ring-primary/10">
+            <AvatarImage
+              src={friend.profileImageUrl
+                ? (friend.profileImageUrl.startsWith('http')
+                  ? friend.profileImageUrl
+                  : `http://localhost:8083${friend.profileImageUrl}`)
+                : `https://api.dicebear.com/6.x/initials/svg?seed=${friend.name}`}
+            />
+            <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold">
               {friend.name.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div>
-            <h2 className="text-lg font-semibold">{friend.name}</h2>
+            <h2 className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+              {friend.name}
+            </h2>
             <div className="flex items-center gap-2">
-              <div className={`h-2 w-2 rounded-full ${connectionStatus === "connected" ? "bg-green-500" :
-                  connectionStatus === "connecting" ? "bg-yellow-500" :
-                    "bg-red-500"
+              <div className={`h-2 w-2 rounded-full animate-pulse ${connectionStatus === "connected" ? "bg-green-500 shadow-lg shadow-green-500/50" :
+                  connectionStatus === "connecting" ? "bg-yellow-500 shadow-lg shadow-yellow-500/50" :
+                    "bg-red-500 shadow-lg shadow-red-500/50"
                 }`} />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground font-medium">
                 {connectionStatus === "connected" ? "Online" :
                   connectionStatus === "connecting" ? "Connecting..." :
                     "Disconnected"}
@@ -370,15 +529,73 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
                           </span>
                         )}
                         <div
-                          className={`rounded-2xl px-4 py-2.5 shadow-sm transition-all ${isCurrentUser
-                              ? "bg-primary text-primary-foreground rounded-br-md hover:bg-primary/90"
-                              : "bg-muted text-foreground rounded-bl-md hover:bg-muted/80"
+                          className={`rounded-2xl px-4 py-2.5 shadow-sm transition-all relative group ${isCurrentUser
+                            ? "bg-primary text-primary-foreground rounded-br-md hover:bg-primary/90"
+                            : "bg-muted text-foreground rounded-bl-md hover:bg-muted/80"
                             } ${isGrouped && isCurrentUser ? "rounded-tr-md" : ""} ${isGrouped && !isCurrentUser ? "rounded-tl-md" : ""}`}
                         >
-                          <p className="text-sm break-words whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                          <p className={`text-xs mt-1.5 ${isCurrentUser ? "text-primary-foreground/70" : "text-muted-foreground"} ${isGrouped ? "hidden" : ""}`}>
-                            {messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
+                          {message.isDeleted ? (
+                            <p className="text-sm italic opacity-70">This message was deleted</p>
+                          ) : (
+                            <>
+                              {message.fileUrl && (
+                                <div className="mb-2">
+                                  {message.messageType === "IMAGE" ? (
+                                    <img
+                                      src={`http://localhost:8083${message.fileUrl}`}
+                                      alt={message.fileName || "Image"}
+                                      className="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                      onClick={() => window.open(`http://localhost:8083${message.fileUrl}`, '_blank')}
+                                    />
+                                  ) : (
+                                    <a
+                                      href={`http://localhost:8083${message.fileUrl}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-2 p-2 rounded-lg bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 transition-colors"
+                                    >
+                                      {(() => {
+                                        const Icon = getFileIcon(message.messageType, message.fileType);
+                                        return <Icon className="h-5 w-5" />;
+                                      })()}
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium truncate">{message.fileName || "File"}</p>
+                                        {message.fileSize && (
+                                          <p className="text-xs opacity-70">{formatFileSize(message.fileSize)}</p>
+                                        )}
+                                      </div>
+                                    </a>
+                                  )}
+                                </div>
+                              )}
+                              {message.content && (
+                                <p className="text-sm break-words whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                              )}
+                              <div className={`flex items-center gap-1 mt-1.5 ${isGrouped ? "hidden" : ""}`}>
+                                <p className={`text-xs ${isCurrentUser ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                                  {messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                                {isCurrentUser && (
+                                  <div className="ml-1 flex items-center gap-1">
+                                    {message.isRead ? (
+                                      <CheckCheck className="h-3.5 w-3.5 text-primary-foreground/70" />
+                                    ) : (
+                                      <Check className="h-3.5 w-3.5 text-primary-foreground/50" />
+                                    )}
+                                    {message.id && (
+                                      <button
+                                        onClick={() => handleDeleteMessage(message.id!)}
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                                        title="Delete message"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                       {isCurrentUser && (
@@ -393,6 +610,22 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
                   </div>
                 );
               })
+            )}
+            {/* Typing indicator */}
+            {friendTyping && (
+              <div className="flex items-center gap-2 mb-4">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={`https://api.dicebear.com/6.x/initials/svg?seed=${friend.name}`} />
+                  <AvatarFallback>{friend.name.charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="bg-muted rounded-2xl px-4 py-2.5">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                </div>
+              </div>
             )}
             {/* Invisible element to scroll to */}
             <div ref={messagesEndRef} className="h-1" />
@@ -410,8 +643,39 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
             </div>
           </div>
         )}
-        <div className="px-6 py-4 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+        <div className="px-6 py-4 bg-gradient-to-r from-card via-card to-primary/5 backdrop-blur-sm supports-[backdrop-filter]:bg-card/60 border-t shadow-lg">
+          {selectedFile && (
+            <div className="mb-3 flex items-center gap-2 p-3 bg-muted rounded-lg">
+              <Paperclip className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm flex-1 truncate">{selectedFile.name}</span>
+              <button
+                onClick={() => {
+                  setSelectedFile(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
           <div className="flex items-end gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileSelect}
+              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              className="shrink-0"
+              title="Attach file"
+            >
+              <Paperclip className="h-5 w-5" />
+            </Button>
             <div className="flex-1 relative">
               <Input
                 placeholder="Type a message..."
@@ -419,18 +683,24 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 className="min-h-[44px] pr-12 resize-none rounded-full border-2 focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 transition-all"
-                disabled={connectionStatus === "disconnected"}
+                disabled={connectionStatus === "disconnected" || uploading}
               />
             </div>
-            <Button
-              onClick={handleSendMessage}
-              disabled={!newMessage.trim() || connectionStatus === "disconnected"}
-              size="icon"
-              className="h-11 w-11 rounded-full shrink-0 shadow-md hover:shadow-lg transition-shadow disabled:opacity-50"
-            >
-              <Send className="h-5 w-5" />
-              <span className="sr-only">Send</span>
-            </Button>
+            {(newMessage.trim() || selectedFile) && (
+              <Button
+                onClick={selectedFile ? handleFileUpload : handleSendMessage}
+                disabled={connectionStatus === "disconnected" || uploading}
+                size="icon"
+                className="h-11 w-11 rounded-full shrink-0 shadow-md hover:shadow-lg transition-shadow disabled:opacity-50"
+              >
+                {uploading ? (
+                  <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+                <span className="sr-only">Send</span>
+              </Button>
+            )}
           </div>
         </div>
       </div>

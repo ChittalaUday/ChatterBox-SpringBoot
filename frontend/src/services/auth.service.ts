@@ -13,6 +13,7 @@ interface RegisterRequest {
   dob: string;
   role: string;
   mobile?: string;
+  profileImageUrl?: string;
 }
 
 interface User {
@@ -22,6 +23,8 @@ interface User {
   gender: string;
   dob: string;
   mobile?: string;
+  profileImageUrl?: string;
+  bio?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -142,6 +145,69 @@ class AuthService {
       return response.ok;
     } catch (error) {
       return false;
+    }
+  }
+
+  async updateUser(userData: {
+    name?: string;
+    gender?: string;
+    dob?: string;
+    mobile?: string;
+    profileImageUrl?: string;
+    bio?: string;
+  }): Promise<User> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/users/me`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = 'Failed to update user';
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const responseData = await response.json();
+    return responseData.user;
+  }
+
+  async getCurrentUserFromServer(): Promise<User | null> {
+    const token = this.getToken();
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      return await response.json();
+    } catch (error) {
+      return null;
     }
   }
 }

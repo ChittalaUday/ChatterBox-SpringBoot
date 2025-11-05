@@ -30,6 +30,8 @@ public class RegisterRequest {
     @Pattern(regexp = "^\\d{10}$", message = "Mobile number must be exactly 10 digits")
     private String mobile;
 
+    private String profileImageUrl;
+
     // Getters and Setters
 
     public String getName() {
@@ -78,5 +80,13 @@ public class RegisterRequest {
 
     public void setMobile(String mobile) {
         this.mobile = mobile;
+    }
+
+    public String getProfileImageUrl() {
+        return profileImageUrl;
+    }
+
+    public void setProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
     }
 }
