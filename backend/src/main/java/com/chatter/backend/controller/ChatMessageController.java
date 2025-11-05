@@ -280,8 +280,22 @@ public class ChatMessageController {
             Map<Long, Long> result = new HashMap<>();
             
             for (Object[] row : unreadCounts) {
-                Long senderId = (Long) row[0];
-                Long count = (Long) row[1];
+                // Handle both Integer and Long types for senderId
+                Long senderId;
+                if (row[0] instanceof Integer) {
+                    senderId = ((Integer) row[0]).longValue();
+                } else {
+                    senderId = (Long) row[0];
+                }
+                
+                // Handle both Integer and Long types for count
+                Long count;
+                if (row[1] instanceof Integer) {
+                    count = ((Integer) row[1]).longValue();
+                } else {
+                    count = (Long) row[1];
+                }
+                
                 result.put(senderId, count);
             }
             
