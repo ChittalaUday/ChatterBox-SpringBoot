@@ -7,8 +7,14 @@ public class ChatMessageDTO {
     private UserDTO sender;
     private UserDTO receiver;
     private String content;
+    private String fileUrl;
+    private String fileName;
+    private String fileType;
+    private Long fileSize;
+    private String messageType = "TEXT";
     private LocalDateTime timestamp;
     private boolean isRead;
+    private boolean isDeleted = false;
     
     // Constructors
     public ChatMessageDTO() {}
@@ -60,6 +66,54 @@ public class ChatMessageDTO {
     
     public void setRead(boolean isRead) {
         this.isRead = isRead;
+    }
+    
+    public String getFileUrl() {
+        return fileUrl;
+    }
+    
+    public void setFileUrl(String fileUrl) {
+        this.fileUrl = fileUrl;
+    }
+    
+    public String getFileName() {
+        return fileName;
+    }
+    
+    public void setFileName(String fileName) {
+        this.fileName = fileName;
+    }
+    
+    public String getFileType() {
+        return fileType;
+    }
+    
+    public void setFileType(String fileType) {
+        this.fileType = fileType;
+    }
+    
+    public Long getFileSize() {
+        return fileSize;
+    }
+    
+    public void setFileSize(Long fileSize) {
+        this.fileSize = fileSize;
+    }
+    
+    public String getMessageType() {
+        return messageType;
+    }
+    
+    public void setMessageType(String messageType) {
+        this.messageType = messageType;
+    }
+    
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+    
+    public void setDeleted(boolean isDeleted) {
+        this.isDeleted = isDeleted;
     }
     
     // Inner class for UserDTO

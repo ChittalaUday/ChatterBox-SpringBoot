@@ -10,6 +10,8 @@ interface User {
   gender: string;
   dob: string;
   mobile?: string;
+  profileImageUrl?: string;
+  bio?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,14 +29,27 @@ interface RegisterRequest {
   dob: string;
   role: string;
   mobile?: string;
+  profileImageUrl?: string;
+}
+
+interface UpdateUserRequest {
+  name?: string;
+  gender?: string;
+  dob?: string;
+  mobile?: string;
+  profileImageUrl?: string;
+  bio?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   register: (userData: RegisterRequest) => Promise<void>;
+  updateUser: (userData: UpdateUserRequest) => Promise<void>;
+  refreshUser: () => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isInitializing: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,6 +57,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Initialize auth state
   useEffect(() => {
@@ -65,6 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           AuthService.logout();
         }
       }
+      
+      // Mark initialization as complete
+      setIsInitializing(false);
     };
     
     initializeAuth();
@@ -100,6 +119,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateUser = async (userData: UpdateUserRequest) => {
+    try {
+      const updatedUser = await AuthService.updateUser(userData);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      setUser(updatedUser);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const refreshUser = async () => {
+    try {
+      const currentUser = await AuthService.getCurrentUserFromServer();
+      if (currentUser) {
+        localStorage.setItem("user", JSON.stringify(currentUser));
+        setUser(currentUser);
+      }
+    } catch (error) {
+      console.error("Failed to refresh user", error);
+    }
+  };
+
   const logout = () => {
     AuthService.logout();
     setUser(null);
@@ -107,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ user, login, register, updateUser, refreshUser, logout, isAuthenticated, isInitializing }}>
       {children}
     </AuthContext.Provider>
   );

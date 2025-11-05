@@ -1,8 +1,8 @@
 import { Friendship, User, Notification } from './chat.types';
 
-const API_BASE_URL = 'http://192.168.1.42:8083/api/friends';
-const USER_API_BASE_URL = 'http://192.168.1.42:8083/api/users';
-const NOTIFICATION_API_BASE_URL = 'http://192.168.1.42:8083/api/notifications';
+const API_BASE_URL = 'http://localhost:8083/api/friends';
+const USER_API_BASE_URL = 'http://localhost:8083/api/users';
+const NOTIFICATION_API_BASE_URL = 'http://localhost:8083/api/notifications';
 
 class FriendsService {
   private getAuthHeaders() {
