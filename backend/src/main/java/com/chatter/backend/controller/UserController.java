@@ -11,6 +11,7 @@ import com.chatter.backend.util.JwtUtil;
 import jakarta.validation.Valid;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PutMapping;
 
 @RestController
@@ -38,11 +40,11 @@ public class UserController {
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
         if (userRepo.existsByEmail(registerRequest.getEmail())) {
-            return ResponseEntity.badRequest().body("Email already exists. please try again with new email...");
+            return ResponseEntity.badRequest().body(Map.of("message", "Email already exists. please try again with new email..."));
         }
         if (registerRequest.getMobile() != null && userRepo.existsByMobile(registerRequest.getMobile())) {
             return ResponseEntity.badRequest()
-                    .body("Mobile number already exists. please try again with new mobile number...");
+                    .body(Map.of("message", "Mobile number already exists. please try again with new mobile number..."));
         }
 
         // Create User entity from RegisterRequest
@@ -77,7 +79,7 @@ public class UserController {
         User user = userRepo.findByEmail(login.getEmail());
 
         if (user == null || !passwordEncoder.matches(login.getPassword(), user.getPassword())) {
-            return ResponseEntity.status(401).body("Invalid email or password");
+            return ResponseEntity.status(401).body(Map.of("message", "Invalid email or password"));
         }
 
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole(), user.getId());
@@ -91,6 +93,36 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
 
+    @GetMapping("/users/search")
+    public ResponseEntity<?> searchUsers(@RequestHeader("Authorization") String authHeader,
+            @RequestParam(required = false) String query) {
+        try {
+            String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : authHeader;
+            String email = jwtUtil.extractUsername(token);
+            User currentUser = userRepo.findByEmail(email);
+
+            if (currentUser == null) {
+                return ResponseEntity.status(404).body(Map.of("message", "User not found"));
+            }
+
+            List<User> users;
+            if (query != null && !query.trim().isEmpty()) {
+                users = userRepo.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(query, query);
+            } else {
+                users = userRepo.findAll();
+            }
+
+            // Remove current user from the list
+            users = users.stream()
+                    .filter(user -> user.getId() != currentUser.getId())
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(users);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Error searching users: " + e.getMessage()));
+        }
+    }
+
     @GetMapping("/users/me")
     public ResponseEntity<?> getCurrentUser(@RequestHeader("Authorization") String authHeader) {
         String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : authHeader;
@@ -101,7 +133,7 @@ public class UserController {
         // Find user by email
         User user = userRepo.findByEmail(email);
         if (user == null) {
-            return ResponseEntity.status(404).body("User not found");
+            return ResponseEntity.status(404).body(Map.of("message", "User not found"));
         }
 
         return ResponseEntity.ok(user);
@@ -121,7 +153,7 @@ public class UserController {
         // 3️⃣ Find the user
         User existingUser = userRepo.findByEmail(email);
         if (existingUser == null) {
-            return ResponseEntity.status(404).body("User not found");
+            return ResponseEntity.status(404).body(Map.of("message", "User not found"));
         }
 
         // 4️⃣ Prevent sensitive updates
@@ -162,7 +194,7 @@ public class UserController {
         // 3️⃣ Find the user
         User existingUser = userRepo.findByEmail(email);
         if (existingUser == null) {
-            return ResponseEntity.status(404).body("User not found");
+            return ResponseEntity.status(404).body(Map.of("message", "User not found"));
         }
 
         // 4️⃣ Prevent sensitive updates

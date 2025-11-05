@@ -18,10 +18,11 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import AuthService from "@/services/auth.service"
+import { useAuth } from "@/context/auth-context"
 
 export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
   const router = useRouter();
+  const { register } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,7 +45,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     setError("");
 
     try {
-      const response = await AuthService.register({
+      await register({
         name,
         email,
         password,
@@ -54,8 +55,6 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
         mobile: mobile || undefined
       });
       
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
       router.push("/dashboard");
     } catch (err) {
       // Type guard to check if err is an Error object

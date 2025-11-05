@@ -45,13 +45,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialize auth state
   useEffect(() => {
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       const token = AuthService.getToken();
       const currentUser = AuthService.getCurrentUser();
       
       if (token && currentUser) {
-        setUser(currentUser);
-        setIsAuthenticated(true);
+        // Validate token with backend
+        try {
+          const isValid = await AuthService.validateToken();
+          if (isValid) {
+            setUser(currentUser);
+            setIsAuthenticated(true);
+          } else {
+            // Token is invalid, clear storage
+            AuthService.logout();
+          }
+        } catch (error) {
+          // Error validating token, clear storage
+          AuthService.logout();
+        }
       }
     };
     
@@ -61,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       const response = await AuthService.login({ email, password });
+      localStorage.setItem("token", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
       setUser(response.user);
       setIsAuthenticated(true);
     } catch (error) {
@@ -77,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       
       const response = await AuthService.register(userDataWithRole);
+      localStorage.setItem("token", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
       setUser(response.user);
       setIsAuthenticated(true);
     } catch (error) {
