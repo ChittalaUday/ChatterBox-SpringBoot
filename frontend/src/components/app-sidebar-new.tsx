@@ -117,19 +117,19 @@ export function AppSidebar({
 
   // WebSocket message listener for updating unread counts
   React.useEffect(() => {
-    const handleNewMessage = (message: ChatMessage | any) => {
+    const handleNewMessage = (message: ChatMessage & { type?: string }) => {
       // Handle read status updates
-      if (message && message.type === "UNREAD_COUNT_UPDATED") {
+      if (message.type === "UNREAD_COUNT_UPDATED") {
         loadUnreadCounts();
         loadLastMessages(); // Refresh last messages too
         return;
       }
       
       // Refresh unread counts when a new message arrives or when messages are marked as read
-      if (message && message.sender && message.receiver) {
+      if (message.sender && message.receiver) {
         loadUnreadCounts();
         // Update last message for the sender
-        if (message.sender.id && message.content && message.content !== 'MESSAGES_READ') {
+        if (message.content && message.content !== 'MESSAGES_READ') {
           setLastMessages(prev => {
             const updated = new Map(prev);
             updated.set(message.sender.id, {
@@ -155,23 +155,23 @@ export function AppSidebar({
     {
       title: "Chats",
       icon: MessageSquare,
-      path: "/chat",
+      path: "/dashboard/chat",
     },
     {
       title: "Friends",
       icon: Users,
-      path: "/friends",
+      path: "/dashboard/friends",
     },
     {
       title: "Notifications",
       icon: Bell,
-      path: "/notifications",
+      path: "/dashboard/notifications",
       badge: unreadCount > 0 ? unreadCount : undefined,
     },
     {
       title: "Settings",
       icon: Settings,
-      path: "/settings",
+      path: "/dashboard/settings",
     },
   ]
 
@@ -194,30 +194,32 @@ export function AppSidebar({
   }
 
   const handleNavClick = (path: string) => {
-    router.push(path)
-    setOpen(true)
+    // Fix the path to include /dashboard prefix
+    const fullPath = path.startsWith('/dashboard') ? path : `/dashboard${path}`;
+    router.push(fullPath);
+    setOpen(true);
   }
 
   const handleFriendClick = (friendId: number) => {
-    router.push(`/chat?friendId=${friendId}`)
-    setOpen(true)
+    router.push(`/dashboard/chat?friendId=${friendId}`);
+    setOpen(true);
   }
 
   return (
     <Sidebar
       collapsible="icon"
-      className="overflow-hidden *:data-[sidebar=sidebar]:flex-row"
+      className="overflow-hidden"
     >
-      {/* First sidebar - Navigation icons */}
+      {/* First sidebar - Navigation icons (always visible) */}
       <Sidebar
         collapsible="none"
-        className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r"
+        className="w-[calc(var(--sidebar-width-icon)+1px)] border-r"
       >
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild className="md:h-8 md:p-0">
-                <button onClick={() => handleNavClick("/chat")}>
+                <button onClick={() => handleNavClick("/dashboard/chat")}>
                   <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                     <MessageSquare className="size-4" />
                   </div>
@@ -235,8 +237,9 @@ export function AppSidebar({
             <SidebarGroupContent className="px-1.5 md:px-0">
               <SidebarMenu>
                 {navItems.map((item) => {
-                  const isActive = currentPath?.startsWith(item.path) || 
-                    (item.path === "/chat" && currentPath === "/")
+                  const isActive = currentPath === item.path || 
+                    (item.path === "/dashboard/chat" && (currentPath === "/" || currentPath === "/dashboard")) ||
+                    (currentPath?.startsWith(item.path))
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
@@ -278,8 +281,8 @@ export function AppSidebar({
         </SidebarFooter>
       </Sidebar>
 
-      {/* Second sidebar - Friends list (only show on chat page) */}
-      {currentPath?.startsWith("/chat") && (
+      {/* Second sidebar - Friends list (now show on all dashboard pages) */}
+      {(currentPath?.startsWith("/dashboard")) && (
         <Sidebar collapsible="none" className="hidden flex-1 md:flex">
           <SidebarHeader className="gap-3.5 border-b p-4 bg-gradient-to-r from-sidebar-accent/50 via-sidebar-accent/30 to-transparent">
             <div className="flex w-full items-center justify-between">

@@ -10,7 +10,7 @@ import FriendsService from "@/services/friends.service";
 import { User } from "@/services/chat.types";
 import { AddFriendDialog } from "./add-friend-dialog";
 
-export function FriendsList() {
+export function FriendsList({ onRefresh }: { onRefresh?: () => void }) {
   const { user } = useAuth();
   const [friends, setFriends] = useState<User[]>([]);
   const [pendingRequests, setPendingRequests] = useState<User[]>([]);
@@ -20,6 +20,7 @@ export function FriendsList() {
   useEffect(() => {
     loadFriendsData();
   }, []);
+
 
   const loadFriendsData = async () => {
     try {
@@ -77,86 +78,118 @@ export function FriendsList() {
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>Friends</CardTitle>
-        <AddFriendDialog onFriendAdded={loadFriendsData} />
+    <Card className="border-2 shadow-xl bg-gradient-to-br from-card via-card to-primary/5 h-full flex flex-col">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-2xl flex items-center gap-2">
+          <span className="text-primary">Friends</span>
+        </CardTitle>
       </CardHeader>
-      <CardContent>
-        {error && <div className="text-red-500 mb-4">{error}</div>}
-        
-        {pendingRequests.length > 0 && (
-          <div className="mb-6">
-            <h3 className="font-semibold mb-2">Friend Requests</h3>
-            <ScrollArea className="h-40">
-              {pendingRequests.map((request) => {
-                // Add defensive check for request object
-                if (!request || request.id === undefined) {
-                  return null;
-                }
-                
-                return (
-                  <div key={request.id} className="flex items-center justify-between p-2 border-b">
-                    <div className="flex items-center space-x-2">
-                      <Avatar>
-                        <AvatarImage src={`https://api.dicebear.com/6.x/initials/svg?seed=${request.name}`} />
-                        <AvatarFallback>{request.name?.charAt(0) || 'U'}</AvatarFallback>
-                      </Avatar>
-                      <span>{request.name || 'Unknown User'}</span>
-                    </div>
-                    <div className="space-x-2">
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleAcceptRequest(request.id)}
-                      >
-                        Accept
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleRejectRequest(request.id)}
-                      >
-                        Reject
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </ScrollArea>
+      <CardContent className="flex-1 flex flex-col overflow-hidden">
+        {error && (
+          <div className="text-red-500 text-sm mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+            {error}
           </div>
         )}
-
-        <h3 className="font-semibold mb-2">Friends ({friends.length})</h3>
-        {friends.length === 0 ? (
-          <p className="text-muted-foreground">No friends yet</p>
+        
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-muted-foreground">Loading friends...</p>
+          </div>
         ) : (
-          <ScrollArea className="h-60">
-            {friends.map((friend) => {
-              // Add defensive check for friend object
-              if (!friend || friend.id === undefined) {
-                return null;
-              }
-              
-              return (
-                <div key={friend.id} className="flex items-center justify-between p-2 border-b">
-                  <div className="flex items-center space-x-2">
-                    <Avatar>
-                      <AvatarImage src={`https://api.dicebear.com/6.x/initials/svg?seed=${friend.name}`} />
-                      <AvatarFallback>{friend.name?.charAt(0) || 'U'}</AvatarFallback>
-                    </Avatar>
-                    <span>{friend.name || 'Unknown User'}</span>
+          <>
+            {pendingRequests.length > 0 && (
+              <div className="mb-6">
+                <h3 className="font-semibold mb-3 text-lg">Friend Requests ({pendingRequests.length})</h3>
+                <ScrollArea className="h-40">
+                  <div className="space-y-2">
+                    {pendingRequests.map((request) => {
+                      if (!request || request.id === undefined) {
+                        return null;
+                      }
+                      
+                      return (
+                        <div key={request.id} className="flex items-center justify-between p-3 rounded-lg border-2 hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage 
+                                src={request.profileImageUrl || `https://api.dicebear.com/6.x/initials/svg?seed=${request.name}`} 
+                                alt={request.name}
+                              />
+                              <AvatarFallback>{request.name?.charAt(0) || 'U'}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{request.name || 'Unknown User'}</p>
+                              <p className="text-xs text-muted-foreground">{request.email}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleAcceptRequest(request.id)}
+                              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                            >
+                              Accept
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleRejectRequest(request.id)}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => handleRemoveFriend(friend.id)}
-                  >
-                    Remove
-                  </Button>
+                </ScrollArea>
+              </div>
+            )}
+
+            <div className="flex-1 flex flex-col min-h-0">
+              <h3 className="font-semibold mb-3 text-lg">My Friends ({friends.length})</h3>
+              {friends.length === 0 ? (
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                  <p>No friends yet</p>
                 </div>
-              );
-            })}
-          </ScrollArea>
+              ) : (
+                <ScrollArea className="flex-1">
+                  <div className="space-y-2">
+                    {friends.map((friend) => {
+                      if (!friend || friend.id === undefined) {
+                        return null;
+                      }
+                      
+                      return (
+                        <div key={friend.id} className="flex items-center justify-between p-3 rounded-lg border-2 hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage 
+                                src={friend.profileImageUrl || `https://api.dicebear.com/6.x/initials/svg?seed=${friend.name}`} 
+                                alt={friend.name}
+                              />
+                              <AvatarFallback>{friend.name?.charAt(0) || 'U'}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{friend.name || 'Unknown User'}</p>
+                              <p className="text-xs text-muted-foreground">{friend.email}</p>
+                            </div>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleRemoveFriend(friend.id)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

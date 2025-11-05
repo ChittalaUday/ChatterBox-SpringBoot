@@ -23,7 +23,7 @@ export function AppLayout({ children, onRefreshFriends }: AppLayoutProps) {
   const [loading, setLoading] = useState(true);
   
   // Get selected friend ID from URL params
-  const selectedFriendId = pathname === "/chat" 
+  const selectedFriendId = pathname === "/dashboard/chat" || pathname === "/chat"
     ? searchParams.get("friendId") 
       ? parseInt(searchParams.get("friendId")!) 
       : null

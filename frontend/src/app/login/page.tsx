@@ -12,7 +12,7 @@ export default function Page() {
   useEffect(() => {
     // Wait for initialization to complete before redirecting
     if (!isInitializing && isAuthenticated) {
-      router.push("/chat");
+      router.push("/dashboard/chat");
     }
   }, [isAuthenticated, isInitializing, router]);
 

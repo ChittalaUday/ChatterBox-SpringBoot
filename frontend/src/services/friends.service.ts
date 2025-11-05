@@ -298,6 +298,36 @@ class FriendsService {
       throw new Error('Invalid JSON response from server');
     }
   }
+
+  async getAllNotifications(): Promise<Notification[]> {
+    const response = await fetch(`${NOTIFICATION_API_BASE_URL}/all`, {
+      method: 'GET',
+      headers: this.getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = 'Failed to fetch all notifications';
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const responseText = await response.text();
+    if (!responseText) {
+      return [];
+    }
+    
+    try {
+      return JSON.parse(responseText);
+    } catch (e) {
+      throw new Error('Invalid JSON response from server');
+    }
+  }
   
   async markNotificationAsRead(notificationId: number): Promise<Notification> {
     const response = await fetch(`${NOTIFICATION_API_BASE_URL}/${notificationId}/read`, {
