@@ -9,8 +9,10 @@ import com.chatter.backend.dto.ChatMessageDTO;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,6 +29,9 @@ public class ChatMessageController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
     @GetMapping("/messages")
     public ResponseEntity<?> getChatHistory(
@@ -105,9 +110,45 @@ public class ChatMessageController {
             }
             
             ChatMessage message = new ChatMessage(sender, receiver, content);
+            message.setTimestamp(LocalDateTime.now());
+            message.setRead(false);
             ChatMessage savedMessage = chatMessageRepository.save(message);
             
-            return ResponseEntity.ok(savedMessage);
+            // Convert to DTO for WebSocket broadcasting
+            ChatMessageDTO messageDTO = new ChatMessageDTO();
+            messageDTO.setId(savedMessage.getId());
+            messageDTO.setContent(savedMessage.getContent());
+            messageDTO.setTimestamp(savedMessage.getTimestamp());
+            messageDTO.setRead(savedMessage.isRead());
+            
+            // Set sender info
+            ChatMessageDTO.UserDTO senderDTO = new ChatMessageDTO.UserDTO();
+            senderDTO.setId(sender.getId());
+            senderDTO.setName(sender.getName());
+            senderDTO.setEmail(sender.getEmail());
+            messageDTO.setSender(senderDTO);
+            
+            // Set receiver info
+            ChatMessageDTO.UserDTO receiverDTO = new ChatMessageDTO.UserDTO();
+            receiverDTO.setId(receiver.getId());
+            receiverDTO.setName(receiver.getName());
+            receiverDTO.setEmail(receiver.getEmail());
+            messageDTO.setReceiver(receiverDTO);
+            
+            // Broadcast via WebSocket to both sender and receiver
+            messagingTemplate.convertAndSendToUser(
+                String.valueOf(receiver.getId()), 
+                "/queue/messages", 
+                messageDTO
+            );
+            messagingTemplate.convertAndSendToUser(
+                String.valueOf(sender.getId()), 
+                "/queue/messages", 
+                messageDTO
+            );
+            
+            // Return DTO for consistent response format
+            return ResponseEntity.ok(messageDTO);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("message", "Error sending message: " + e.getMessage()));
         }

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://192.168.1.42:8083/api';
+const API_BASE_URL = 'http://localhost:8083/api';
 
 interface LoginRequest {
   email: string;

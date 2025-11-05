@@ -7,17 +7,27 @@ import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isInitializing } = useAuth();
 
   useEffect(() => {
-    if (isAuthenticated) {
-      router.push("/dashboard");
+    // Wait for initialization to complete before redirecting
+    if (!isInitializing && isAuthenticated) {
+      router.push("/chat");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isInitializing, router]);
 
   const handleGetStarted = () => {
     router.push("/login");
   };
+
+  // Show loading while checking authentication
+  if (isInitializing) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div>Loading...</div>
+      </div>
+    );
+  }
 
   if (isAuthenticated) {
     return (

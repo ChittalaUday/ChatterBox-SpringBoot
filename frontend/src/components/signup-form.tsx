@@ -55,7 +55,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
         mobile: mobile || undefined
       });
       
-      router.push("/dashboard");
+      router.push("/chat");
     } catch (err) {
       // Type guard to check if err is an Error object
       if (err instanceof Error) {

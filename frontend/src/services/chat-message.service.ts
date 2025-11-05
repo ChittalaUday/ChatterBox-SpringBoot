@@ -1,6 +1,6 @@
 import { ChatMessage } from './chat.types';
 
-const API_BASE_URL = 'http://192.168.1.42:8083/api/chat';
+const API_BASE_URL = 'http://localhost:8083/api/chat';
 
 class ChatMessageService {
   private getAuthHeaders() {

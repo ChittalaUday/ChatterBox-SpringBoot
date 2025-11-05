@@ -17,6 +17,8 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 import com.chatter.backend.util.JwtUtil;
+import com.chatter.backend.model.User;
+import com.chatter.backend.repository.UserRepo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,9 +34,11 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
     private static final Logger logger = LoggerFactory.getLogger(WebSocketSecurityConfig.class);
 
     private final JwtUtil jwtUtil;
+    private final UserRepo userRepository;
 
-    public WebSocketSecurityConfig(JwtUtil jwtUtil) {
+    public WebSocketSecurityConfig(JwtUtil jwtUtil, UserRepo userRepository) {
         this.jwtUtil = jwtUtil;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -56,6 +60,13 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
                             logger.info("Extracted username from JWT: {}", username);
                             
                             if (username != null && jwtUtil.validateToken(jwt)) {
+                                // Load user from database to get user ID
+                                User user = userRepository.findByEmail(username);
+                                if (user == null) {
+                                    logger.warn("User not found for email: {}", username);
+                                    return message;
+                                }
+                                
                                 String role = jwtUtil.extractUserRole(jwt);
                                 logger.info("Extracted role from JWT: {}", role);
                                 
@@ -71,11 +82,14 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
                                     authorities.add(new SimpleGrantedAuthority("USER"));
                                 }
                                 
+                                // Use user ID as principal name for convertAndSendToUser routing
+                                // This ensures messages are routed to /user/{userId}/queue/messages
+                                String userId = String.valueOf(user.getId());
                                 UsernamePasswordAuthenticationToken authToken = 
-                                    new UsernamePasswordAuthenticationToken(username, null, authorities);
+                                    new UsernamePasswordAuthenticationToken(userId, null, authorities);
                                 SecurityContextHolder.getContext().setAuthentication(authToken);
                                 accessor.setUser(authToken);
-                                logger.info("WebSocket authentication successful for user: {}", username);
+                                logger.info("WebSocket authentication successful for user ID: {} (email: {})", userId, username);
                             } else {
                                 logger.warn("Invalid JWT token");
                             }

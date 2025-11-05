@@ -1,48 +1,37 @@
 "use client";
 
+import { Suspense } from "react";
 import { FriendsList } from "@/components/friends-list";
-import ProtectedRoute from "@/components/protected-route";
-import { useAuth } from "@/context/auth-context";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { NotificationsDropdown } from "@/components/notifications-dropdown";
+import { AppLayout } from "@/components/app-layout";
+
+function FriendsContent() {
+  return (
+    <div className="flex-1 overflow-auto">
+      <div className="container mx-auto py-8 px-6 max-w-4xl">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Friends</h1>
+          <p className="text-muted-foreground">
+            Manage your friends and connections
+          </p>
+        </div>
+        <FriendsList />
+      </div>
+    </div>
+  );
+}
 
 export default function FriendsPage() {
-  const { user, logout } = useAuth();
-
-  const handleLogout = () => {
-    logout();
-  };
-
   return (
-    <ProtectedRoute>
-      <div className="flex flex-col h-screen">
-        <header className="border-b">
-          <div className="container flex h-16 items-center justify-between px-4">
-            <Link href="/dashboard">
-              <h1 className="text-xl font-bold">Chatterbox</h1>
-            </Link>
-            <div className="flex items-center gap-4">
-              <NotificationsDropdown />
-              <span>Welcome, {user?.name}</span>
-              <Button variant="outline" onClick={handleLogout}>
-                Logout
-              </Button>
-            </div>
-          </div>
-        </header>
-        <div className="flex-1 container mx-auto py-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-2xl font-bold">Friends</h1>
-              <Link href="/dashboard">
-                <Button variant="outline">Back to Dashboard</Button>
-              </Link>
-            </div>
-            <FriendsList />
-          </div>
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
-    </ProtectedRoute>
+    }>
+      <AppLayout>
+        <FriendsContent />
+      </AppLayout>
+    </Suspense>
   );
 }

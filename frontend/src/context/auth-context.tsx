@@ -35,6 +35,7 @@ interface AuthContextType {
   register: (userData: RegisterRequest) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isInitializing: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,6 +43,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Initialize auth state
   useEffect(() => {
@@ -65,6 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           AuthService.logout();
         }
       }
+      
+      // Mark initialization as complete
+      setIsInitializing(false);
     };
     
     initializeAuth();
@@ -107,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated, isInitializing }}>
       {children}
     </AuthContext.Provider>
   );

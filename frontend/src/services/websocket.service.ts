@@ -44,8 +44,8 @@ class WebSocketService {
     // Try WebSocket first, fallback to SockJS if needed
     // Use the same port as the REST API (8083)
     const brokerURL = this.useSockJS 
-      ? 'http://192.168.1.42:8083/api/ws' 
-      : 'ws://192.168.1.42:8083/api/ws';
+      ? 'http://localhost:8083/api/ws' 
+      : 'ws://localhost:8083/api/ws';
 
     this.stompClient = new Client({
       brokerURL: brokerURL,
