@@ -25,14 +25,27 @@ class WebSocketService {
       return;
     }
 
+    console.log('Using auth token for WebSocket connection:', token);
+
+    // Get user ID from the stored user object
+    const currentUser = AuthService.getCurrentUser();
+    const userId = currentUser?.id;
+    if (!userId) {
+      console.error('No user ID available');
+      return;
+    }
+
+    console.log('Current user ID:', userId);
+
     // Clear previous subscriptions
     this.subscriptions.forEach(sub => sub.unsubscribe());
     this.subscriptions = [];
 
     // Try WebSocket first, fallback to SockJS if needed
+    // Use the same port as the REST API (8083)
     const brokerURL = this.useSockJS 
-      ? 'http://localhost:8083/api/ws' 
-      : 'ws://localhost:8083/api/ws';
+      ? 'http://192.168.1.42:8083/api/ws' 
+      : 'ws://192.168.1.42:8083/api/ws';
 
     this.stompClient = new Client({
       brokerURL: brokerURL,
@@ -84,6 +97,8 @@ class WebSocketService {
         }
 
         // Subscribe to private messages
+        // In Spring WebSocket, when using convertAndSendToUser(userId, "/queue/messages", ...),
+        // the actual destination becomes "/user/{userId}/queue/messages"
         const privateSub = this.stompClient?.subscribe('/user/queue/messages', (message) => {
           try {
             console.log('Received private message:', message.body);
@@ -189,10 +204,12 @@ class WebSocketService {
   }
 
   addMessageListener(listener: (message: ChatMessage) => void) {
+    console.log('Adding message listener');
     this.messageListeners.push(listener);
   }
 
   removeMessageListener(listener: (message: ChatMessage) => void) {
+    console.log('Removing message listener');
     this.messageListeners = this.messageListeners.filter(l => l !== listener);
   }
 

@@ -8,6 +8,9 @@ import java.time.LocalDateTime;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 @Entity
 @Table(name = "users")
 public class User {
@@ -28,11 +31,13 @@ public class User {
     @Column(nullable = false)
     @NotBlank(message = "Password is mandatory")
     @Size(min = 6, message = "Password must be at least 6 characters long")
+    @JsonIgnore
     private String password;
 
     @Column(nullable = false)
     @NotBlank(message = "Role is mandatory")
     @Pattern(regexp = "USER|ADMIN", message = "Role must be either USER or ADMIN")
+    @JsonIgnore
     private String role;
 
     @Column(nullable = true)
@@ -80,6 +85,7 @@ public class User {
         this.email = email;
     }
 
+    @JsonIgnore
     public String getPassword() {
         return password;
     }
@@ -88,6 +94,7 @@ public class User {
         this.password = password;
     }
 
+    @JsonIgnore
     public String getRole() {
         return role;
     }

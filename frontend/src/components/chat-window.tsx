@@ -28,7 +28,9 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
   const loadChatHistory = async () => {
     try {
       setLoading(true);
+      console.log('Loading chat history with friend ID:', friend.id);
       const history = await ChatMessageService.getChatHistory(friend.id);
+      console.log('Loaded chat history:', history);
       setMessages(history);
       setLoading(false);
     } catch (err) {
@@ -38,6 +40,7 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
   };
 
   const handleNewMessage = (message: ChatMessage) => {
+    console.log('Received message in chat window:', message);
     // Check if the message is between the current user and the friend
     if (
       message &&
@@ -50,17 +53,22 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
         (message.sender.id === friend.id && message.receiver.id === user.id)
       )
     ) {
+      console.log('Adding message to chat:', message);
       setMessages(prev => [...prev, message]);
+    } else {
+      console.log('Message filtered out. User ID:', user?.id, 'Friend ID:', friend.id, 'Message sender:', message?.sender?.id, 'Message receiver:', message?.receiver?.id);
     }
   };
 
   const connectToWebSocket = () => {
     // Check if already connected
     if (WebSocketService.isConnected()) {
+      console.log('Already connected to WebSocket');
       setConnectionStatus("connected");
       return;
     }
     
+    console.log('Connecting to WebSocket...');
     setConnectionStatus("connecting");
     
     // Connect to WebSocket
@@ -69,14 +77,17 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
     // Check connection status after a short delay
     setTimeout(() => {
       if (WebSocketService.isConnected()) {
+        console.log('WebSocket connected successfully');
         setConnectionStatus("connected");
       } else {
+        console.log('WebSocket connection failed');
         setConnectionStatus("disconnected");
       }
     }, 1000);
   };
 
   useEffect(() => {
+    console.log('ChatWindow mounted, loading chat history and connecting to WebSocket');
     (async () => {
       await loadChatHistory();
       connectToWebSocket();
@@ -84,6 +95,7 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
     
     // Store the listener in a ref to maintain consistent reference
     const messageListener = (message: ChatMessage) => {
+      console.log('Message listener triggered with message:', message);
       handleNewMessage(message);
     };
     
@@ -100,6 +112,7 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
     }, 5000);
     
     return () => {
+      console.log('Cleaning up WebSocket listener');
       WebSocketService.removeMessageListener(messageListener);
       clearInterval(connectionInterval);
     };
@@ -119,6 +132,7 @@ export function ChatWindow({ friend, onBack }: ChatWindowProps) {
     if (!newMessage.trim() || !user) return;
 
     try {
+      console.log('Sending message:', newMessage);
       // Send via WebSocket for real-time delivery
       const message: ChatMessage = {
         sender: {
